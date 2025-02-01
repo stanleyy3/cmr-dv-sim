@@ -1,8 +1,1 @@
-numpy>=1.21.0,<2.0.0
-noise>=1.2.2,<2.0.0
-scipy>=1.7.0,<2.0.0
-open3d>=0.17.0,<0.18.0  # Required for GUI features and ray casting
-packaging>=21.0,<22.0  # Required for version checking
-tk>=0.1.0  # Required for some GUI features
-pillow>=9.0.0  # Required for Open3D texture support
-matplotlib>=3.5.0  # Required for color mapping 
+open3d
