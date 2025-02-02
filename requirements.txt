@@ -1,1 +1,4 @@
-open3d
+numpy
+noise
+matplotlib
+scipy
