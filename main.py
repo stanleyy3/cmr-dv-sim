@@ -1,5 +1,6 @@
 '''
-Author: Nanaki
+Original Author: Nanaki
+Additional Authors: Stanley, Neil
 '''
 
 import numpy as np
@@ -19,13 +20,16 @@ def visualise_3(true_points):
     ax.set_ylim([-15, 15])
     ax.set_zlim([-5, 5])
     ax.scatter(true_points[:, 0], true_points[:, 1], true_points[:, 2], s=1)
+    
+    # Set initial view
+    ax.view_init(elev=30, azim=-60)
 
     plt.show()
 
 '''
     Generate elevated ground in concentric circles 
 '''
-def generate_inclined_ground(num_points=8000, x_range=(-20, 20), y_range=(-20, 20), 
+def generate_inclined_ground(num_points=8000, x_range=(-50, 50), y_range=(-50, 50), 
                              incline=(0.2, 0.1), noise_scale=0.5, noise_octaves=4):
     """
     Generate a point cloud representing an uneven, inclined ground plane.
@@ -57,6 +61,49 @@ def generate_inclined_ground(num_points=8000, x_range=(-20, 20), y_range=(-20, 2
     points = np.vstack((x_vals, y_vals, z_vals)).T
     
     return points
+
+def generate_inclined_ground_in_chunks(num_chunks=4, points_per_chunk=2000, 
+                                       x_range=(-50, 50), y_range=(-50, 50),
+                                       incline=(0.2, 0.1), noise_scale=0.5, noise_octaves=4):
+    """
+    Generate multiple smaller point clouds (chunks) that together form a larger domain.
+    Each chunk has fewer points, helping keep performance manageable.
+    """
+    chunked_data = []
+    chunk_width = (x_range[1] - x_range[0]) / num_chunks
+    chunk_height = (y_range[1] - y_range[0]) / num_chunks
+
+    for i in range(num_chunks):
+        for j in range(num_chunks):
+            # Determine each chunk’s sub-range
+            x_min = x_range[0] + i * chunk_width
+            x_max = x_min + chunk_width
+            y_min = y_range[0] + j * chunk_height
+            y_max = y_min + chunk_height
+
+            # Generate points for this chunk
+            x_vals = np.random.uniform(x_min, x_max, points_per_chunk)
+            y_vals = np.random.uniform(y_min, y_max, points_per_chunk)
+
+            z_vals = incline[0] * x_vals + incline[1] * y_vals
+            z_noise = np.array([pnoise2(x * noise_scale, y * noise_scale, octaves=noise_octaves)
+                                for x, y in zip(x_vals, y_vals)])
+            z_vals += z_noise
+
+            chunk_points = np.vstack((x_vals, y_vals, z_vals)).T
+            chunked_data.append(chunk_points)
+
+    return chunked_data
+
+def visualise_chunk(chunk_points):
+    """
+    Visualize a single chunk of points.
+    """
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(chunk_points[:, 0], chunk_points[:, 1], chunk_points[:, 2], s=1)
+    ax.view_init(elev=30, azim=-60)
+    plt.show()
 
 def mask_concentric_rings(points, num_rings=15, ring_spacing=0.5, ring_width=0.3, max_radius=10):
     """
@@ -121,3 +168,7 @@ def mask_straight_path(points, path_width=0.8, path_length=10, path_offset=2.0):
 
 visualise_3(terrain_points)
 visualise_3(filtered_points)
+
+# Example usage
+# chunks = generate_inclined_ground_in_chunks()
+# visualise_chunk(chunks[0])  # Only visualize the first chunk
