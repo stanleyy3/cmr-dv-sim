@@ -17,13 +17,14 @@ def create_open3d_pcd(np_points, rgb=(0.0, 0.0, 1.0)):
     pcd.colors = o3d.utility.Vector3dVector(colors)
     return pcd
 
-# --- New Custom Visualizer Function ---
+# --- Modified Custom Visualizer with Key Callbacks for Zoom ---
 def custom_draw_geometries(geometries, window_name="Open3D", lookat=None, front=None, up=None, zoom=None):
     """
-    Create a custom Open3D visualizer where you can set the camera parameters.
-    If a parameter is not provided, the default Open3D values are used.
+    Create a custom Open3D visualizer with key callbacks for zooming.
+    You can adjust the camera parameters (lookat, front, up, zoom) initially.
+    Once the window is open, press "+" to zoom in and "-" to zoom out.
     """
-    vis = o3d.visualization.Visualizer()
+    vis = o3d.visualization.VisualizerWithKeyCallback()
     vis.create_window(window_name=window_name)
     for geo in geometries:
         vis.add_geometry(geo)
@@ -34,8 +35,30 @@ def custom_draw_geometries(geometries, window_name="Open3D", lookat=None, front=
         view_ctrl.set_front(front)
     if up is not None:
         view_ctrl.set_up(up)
-    if zoom is not None:
-        view_ctrl.set_zoom(zoom)
+    # Set initial zoom value.
+    current_zoom = zoom if zoom is not None else 1.0
+    view_ctrl.set_zoom(current_zoom)
+    # Store current zoom in a mutable dictionary.
+    cam_params = {"zoom": current_zoom}
+
+    def increase_zoom(vis_obj):
+        vc = vis_obj.get_view_control()
+        # Multiply zoom factor to zoom in
+        cam_params["zoom"] *= 0.9
+        vc.set_zoom(cam_params["zoom"])
+        print("Increased zoom, new zoom factor:", cam_params["zoom"])
+        return False
+
+    def decrease_zoom(vis_obj):
+        vc = vis_obj.get_view_control()
+        # Multiply zoom factor to zoom out
+        cam_params["zoom"] *= 1.1
+        vc.set_zoom(cam_params["zoom"])
+        print("Decreased zoom, new zoom factor:", cam_params["zoom"])
+        return False
+
+    vis.register_key_callback(ord("+"), increase_zoom)
+    vis.register_key_callback(ord("-"), decrease_zoom)
     vis.run()
     vis.destroy_window()
 
@@ -46,15 +69,15 @@ def visualize_with_open3d_split(terrain_points, left_cone_points, right_cone_poi
                                 lookat=None, front=None, up=None, zoom=None):
     """
     Visualize the full environment (terrain and cones) using a custom Open3D visualizer.
-    The additional camera parameters (lookat, front, up, zoom) allow zooming on any part of the scene.
+    The additional camera parameters (lookat, front, up, zoom) allow setting an initial view.
+    After the window opens, use "+" and "-" to adjust the zoom.
     """
     pcd_terrain = create_open3d_pcd(terrain_points, rgb=terrain_color)
     pcd_left_cones = create_open3d_pcd(left_cone_points, rgb=left_cone_color)
     pcd_right_cones = create_open3d_pcd(right_cone_points, rgb=right_cone_color)
     
     geometries = [pcd_terrain, pcd_left_cones, pcd_right_cones]
-    # Use the custom visualizer instead of the default draw_geometries.
-    custom_draw_geometries(geometries, window_name="Full Environment", 
+    custom_draw_geometries(geometries, window_name="Full Environment",
                             lookat=lookat, front=front, up=up, zoom=zoom)
 
 def visualize_concentric_with_open3d_split(terrain_points, left_cone_points, right_cone_points,
@@ -66,7 +89,8 @@ def visualize_concentric_with_open3d_split(terrain_points, left_cone_points, rig
                                            lookat=None, front=None, up=None, zoom=None):
     """
     Visualize a concentric "ring-based" view of the environment using a custom visualizer.
-    The additional camera parameters allow zooming in on any region.
+    The additional camera parameters allow setting the initial view.
+    Use "+" and "-" keys to adjust the zoom after the window opens.
     """
     ring_positions = np.arange(ring_spacing, max_radius + ring_spacing, ring_spacing)
     
@@ -87,7 +111,7 @@ def visualize_concentric_with_open3d_split(terrain_points, left_cone_points, rig
     pcd_right_cones = create_open3d_pcd(local_right, rgb=right_cone_color)
     
     geometries = [pcd_terrain, pcd_left_cones, pcd_right_cones]
-    custom_draw_geometries(geometries, window_name="Concentric Lidar View", 
+    custom_draw_geometries(geometries, window_name="Concentric Lidar View",
                             lookat=lookat, front=front, up=up, zoom=zoom)
 
 # ============================================================================== 
@@ -138,12 +162,12 @@ def generate_active_piecewise_quadratic_function_with_variation(y_min, y_max, nu
     """
     Actively generate a continuous piecewise quadratic function on [y_min, y_max] that lies entirely within x_range.
     
-    We divide [y_min, y_max] into num_segments equal intervals. For each interval [y₍ᵢ₋₁₎, yᵢ] (with Δy constant),
-    we choose an endpoint xᵢ such that the difference d = xᵢ - x₍ᵢ₋₁₎ is randomly sampled from an allowed interval that ensures
+    We divide [y_min, y_max] into num_segments equal intervals. For each interval [y_{i-1}, y_i] (with Δy constant),
+    we choose an endpoint x_i such that the difference d = x_i - x_{i-1} is randomly sampled from an allowed interval that ensures
     there remains enough room for the remaining segments. d may be positive or negative.
     
     The quadratic coefficient for each segment is then A = d/(Δy)² and the segment is defined by:
-         x(y) = x₍ᵢ₋₁₎ + A · (y - y₍ᵢ₋₁₎)²   for y in [y₍ᵢ₋₁₎, yᵢ].
+         x(y) = x_{i-1} + A · (y - y_{i-1})²   for y in [y_{i-1}, y_i].
     """
     n = num_segments
     y_breaks = np.linspace(y_min, y_max, n+1)
@@ -339,8 +363,7 @@ def main():
     )
     
     # Visualize the full environment with custom camera parameters.
-    # You can change the following camera parameters (lookat, front, up, zoom)
-    # to zoom in on any part of the plot.
+    # Adjust the 'lookat', 'front', 'up', and 'zoom' parameters as needed.
     visualize_with_open3d_split(
         terrain_points,
         left_cone_points,
@@ -348,7 +371,7 @@ def main():
         terrain_color=(0, 0, 1),
         left_cone_color=(1, 0.8, 0),
         right_cone_color=(0.5, 0.8, 1.0),
-        lookat=[-30, -30, 0],   # Change as desired
+        lookat=[-30, -30, 0],
         front=[0, -1, 0],
         up=[0, 0, 1],
         zoom=0.45
@@ -365,7 +388,7 @@ def main():
         terrain_color=(0, 0, 1),
         left_cone_color=(1, 0.8, 0),
         right_cone_color=(0.5, 0.8, 1.0),
-        lookat=[-30, -30, 0],   # Change as desired
+        lookat=[-30, -30, 0],
         front=[0, -1, 0],
         up=[0, 0, 1],
         zoom=0.45
