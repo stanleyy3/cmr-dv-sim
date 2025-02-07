@@ -2,3 +2,4 @@ numpy
 noise
 matplotlib
 scipy
+open3d

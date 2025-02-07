@@ -1,141 +1,77 @@
 import numpy as np
 from noise import pnoise2
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+import open3d as o3d
 
-'''
-Original Author: Nanaki
-Additional Authors: Stanley, Neil
-'''
 
-def visualize_terrain_with_cones(terrain_points, cone_points):
+# ------------------------------------------------------------------------------
+# Utilities to create Open3D point clouds and visualize them
+# ------------------------------------------------------------------------------
+
+def create_open3d_pcd(np_points, rgb=(0.0, 0.0, 1.0)):
     """
-    Visualize the full terrain and the cone points in 3D.
+    Create an open3d.geometry.PointCloud from an Nx3 numpy array of points.
+    Assign a uniform color 'rgb' to all points.
     """
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(np_points)
 
-    # Plot the terrain (blue)
-    ax.scatter(
-        terrain_points[:, 0],
-        terrain_points[:, 1],
-        terrain_points[:, 2],
-        s=1,
-        c='blue',
-        label="Terrain"
-    )
+    # Create Nx3 array of the same color
+    colors = np.tile(np.array(rgb), (len(np_points), 1))
+    pcd.colors = o3d.utility.Vector3dVector(colors)
 
-    # Plot the cones (lighter blue)
-    ax.scatter(
-        cone_points[:, 0],
-        cone_points[:, 1],
-        cone_points[:, 2],
-        s=3,
-        c='lightblue',
-        label="Cones"
-    )
+    return pcd
 
-    ax.set_xlim([np.min(terrain_points[:, 0]), np.max(terrain_points[:, 0])])
-    ax.set_ylim([np.min(terrain_points[:, 1]), np.max(terrain_points[:, 1])])
-    ax.set_zlim([np.min(terrain_points[:, 2]) - 1, np.max(terrain_points[:, 2]) + 2])
 
-    ax.legend()
-    plt.title("Full Environment: Terrain & Cones")
-    plt.show()
-
-def visualize_concentric_lidar_view(terrain_points, cone_points,
-                                    ring_spacing=1.6667,  # 3x the density compared to 5.0
-                                    ring_width=1.0,
-                                    max_radius=20.0):
+def visualize_with_open3d(terrain_points, cone_points,
+                          terrain_color=(0.0, 0.0, 1.0),
+                          cone_color=(0.5, 0.8, 1.0)):
     """
-    Visualize a concentric "ring-based" lidar view around (0,0).
-    We keep points whose distance from (0,0) falls near a set of ring radii.
-
-    Args:
-        terrain_points: (N,3) array of all terrain points.
-        cone_points: (M,3) array of cone points.
-        ring_spacing: The distance between consecutive rings (reduced from 5.0 to ~1.6667).
-        ring_width: Thickness of each ring (in radial distance).
-        max_radius: Maximum radius we consider from (0,0).
-
-    The rings are at distances ring_spacing, 2*ring_spacing, 3*ring_spacing, ... up to max_radius.
+    Visualize the full environment (terrain + cones) using Open3D.
     """
-    # 1) Define the ring positions
+    pcd_terrain = create_open3d_pcd(terrain_points, rgb=terrain_color)
+    pcd_cones   = create_open3d_pcd(cone_points,     rgb=cone_color)
+
+    # Open3D visualization in one window
+    # You can rotate, zoom, etc. interactively
+    o3d.visualization.draw_geometries([pcd_terrain, pcd_cones],
+                                      window_name="Full Environment")
+
+
+def visualize_concentric_with_open3d(terrain_points, cone_points,
+                                     ring_spacing=5.0, ring_width=1.0,
+                                     max_radius=20.0,
+                                     terrain_color=(0.0, 0.0, 1.0),
+                                     cone_color=(0.5, 0.8, 1.0)):
+    """
+    Visualize a concentric "ring-based" lidar view (multiple circular rings)
+    around (0,0) up to max_radius. Only points whose radial distance from (0,0)
+    is within ring_width/2 of a multiple of ring_spacing are included.
+    """
+    # Define ring distances: e.g. [5, 10, 15, 20] if spacing=5, max_radius=20
     ring_positions = np.arange(ring_spacing, max_radius + ring_spacing, ring_spacing)
 
-    # 2) Compute radial distance for terrain
+    # Compute radial distances and filter terrain
     r_terrain = np.sqrt(terrain_points[:, 0]**2 + terrain_points[:, 1]**2)
-    # Keep points whose distance to any ring center is < ring_width/2
-    mask_terrain = np.any(
-        np.abs(r_terrain[:, None] - ring_positions) < (ring_width / 2),
-        axis=1
-    )
+    mask_terrain = np.any(np.abs(r_terrain[:, None] - ring_positions) < (ring_width / 2), axis=1)
     local_terrain = terrain_points[mask_terrain]
 
-    # 3) Compute radial distance for cones
+    # Filter cones
     r_cones = np.sqrt(cone_points[:, 0]**2 + cone_points[:, 1]**2)
-    mask_cones = np.any(
-        np.abs(r_cones[:, None] - ring_positions) < (ring_width / 2),
-        axis=1
-    )
+    mask_cones = np.any(np.abs(r_cones[:, None] - ring_positions) < (ring_width / 2), axis=1)
     local_cones = cone_points[mask_cones]
 
-    # 4) Visualize
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    # Create Open3D point clouds
+    pcd_terrain = create_open3d_pcd(local_terrain, rgb=terrain_color)
+    pcd_cones   = create_open3d_pcd(local_cones,   rgb=cone_color)
 
-    # Plot local terrain points in blue
-    ax.scatter(
-        local_terrain[:, 0],
-        local_terrain[:, 1],
-        local_terrain[:, 2],
-        s=3,
-        c='blue',
-        label="Terrain (Concentric)"
-    )
+    # Visualize
+    o3d.visualization.draw_geometries([pcd_terrain, pcd_cones],
+                                      window_name="Concentric Lidar View")
 
-    # Plot local cone points in lightblue
-    ax.scatter(
-        local_cones[:, 0],
-        local_cones[:, 1],
-        local_cones[:, 2],
-        s=5,
-        c='lightblue',
-        label="Cones (Concentric)"
-    )
 
-    # Set axis limits to +/- max_radius in X and Y
-    ax.set_xlim([-max_radius, max_radius])
-    ax.set_ylim([-max_radius, max_radius])
-
-    # For Z-limits, derive from local points or just pick a fixed range
-    if len(local_terrain) > 0 or len(local_cones) > 0:
-        z_min = None
-        z_max = None
-        if len(local_terrain) > 0:
-            z_min = np.min(local_terrain[:, 2])
-            z_max = np.max(local_terrain[:, 2])
-        if len(local_cones) > 0:
-            z_min_cones = np.min(local_cones[:, 2])
-            z_max_cones = np.max(local_cones[:, 2])
-            if z_min is None or z_min_cones < z_min:
-                z_min = z_min_cones
-            if z_max is None or z_max_cones > z_max:
-                z_max = z_max_cones
-
-        # Add some padding
-        pad = 1.0
-        ax.set_zlim([z_min - pad, z_max + pad])
-    else:
-        # If no points fall into these rings
-        ax.set_zlim([-2, 2])
-
-    ax.legend()
-    plt.title(
-        f"Concentric Lidar View (High Density):\n"
-        f"ring_spacing={ring_spacing}, ring_width={ring_width}, max_radius={max_radius}"
-    )
-    plt.show()
+# ------------------------------------------------------------------------------
+# Terrain & Cone Generation
+# ------------------------------------------------------------------------------
 
 def generate_inclined_ground(num_points=8000,
                              x_range=(-20, 20),
@@ -144,16 +80,16 @@ def generate_inclined_ground(num_points=8000,
                              noise_scale=0.5,
                              noise_octaves=4):
     """
-    Generate a point cloud representing an uneven, inclined ground plane.
+    Generate an inclined, noisy terrain as an Nx3 numpy array (x,y,z).
     """
     a, b = incline  # slope coefficients
     x_vals = np.random.uniform(x_range[0], x_range[1], num_points)
     y_vals = np.random.uniform(y_range[0], y_range[1], num_points)
 
-    # Base plane
+    # Base incline
     z_vals = a * x_vals + b * y_vals
 
-    # Add Perlin noise
+    # Perlin noise
     z_noise = np.array([
         pnoise2(x * noise_scale, y * noise_scale, octaves=noise_octaves)
         for x, y in zip(x_vals, y_vals)
@@ -162,17 +98,19 @@ def generate_inclined_ground(num_points=8000,
 
     return np.vstack((x_vals, y_vals, z_vals)).T
 
+
 def straight_path_function(y):
     """
-    A simple function returning x=0 for all y.
-    Replace with piecewise or non-linear functions as needed.
+    For a given y, return x=0 (straight line path).
+    Replace with piecewise or non-linear logic as needed.
     """
     return 0.0
 
+
 def get_ground_z(terrain_points, x, y):
     """
-    Naive function to find the nearest (x, y) point in terrain_points and return its z.
-    For large N, consider a spatial tree (KDTree) for efficiency.
+    Naive approach: find nearest terrain point in XY-plane and return its z.
+    For large N, consider using a spatial data structure (e.g., KDTree).
     """
     dx = terrain_points[:, 0] - x
     dy = terrain_points[:, 1] - y
@@ -180,16 +118,20 @@ def get_ground_z(terrain_points, x, y):
     idx = np.argmin(dist_sq)
     return terrain_points[idx, 2]
 
+
 def generate_one_cone(cx, cy, ground_z, cone_height=1.5,
                       base_radius=0.5, vertical_segments=5, radial_subdivisions=12):
     """
-    Create a set of points forming a rough conical shape.
+    Generate Nx3 array for a rough cone shape:
+     - multiple horizontal rings from base (z=ground_z) up to the tip (z=ground_z+cone_height)
+     - each ring shrinks in radius from base_radius down to 0 at the tip
     """
     cone_pts = []
     for i in range(vertical_segments):
-        frac = i / (vertical_segments - 1)  # goes 0 -> 1
+        frac = i / (vertical_segments - 1)  # goes from 0 to 1
         z = ground_z + frac * cone_height
-        r = base_radius * (1 - frac)  # base radius shrinks to 0 at the tip
+        # radius shrinks
+        r = base_radius * (1 - frac)
 
         for j in range(radial_subdivisions):
             theta = 2 * np.pi * j / radial_subdivisions
@@ -198,6 +140,7 @@ def generate_one_cone(cx, cy, ground_z, cone_height=1.5,
             cone_pts.append([px, py, z])
 
     return np.array(cone_pts)
+
 
 def generate_cone_points_on_path(terrain_points,
                                  path_func,
@@ -209,33 +152,33 @@ def generate_cone_points_on_path(terrain_points,
                                  cone_height=1.5,
                                  base_radius=0.5):
     """
-    For y in [y_min, y_max], place cones on the left and right sides of the path.
+    For y in [y_min, y_max], place cones at (path_center+left_offset, y)
+    and (path_center+right_offset, y).
     """
     all_cones = []
     y_values = np.arange(y_min, y_max, step_size)
 
     for y in y_values:
-        # Center of the path
         center_x = path_func(y)
 
         # Left cone
         x_left = center_x + left_offset
-        z_left_ground = get_ground_z(terrain_points, x_left, y)
+        z_left = get_ground_z(terrain_points, x_left, y)
         left_cone = generate_one_cone(
             cx=x_left,
             cy=y,
-            ground_z=z_left_ground,
+            ground_z=z_left,
             cone_height=cone_height,
             base_radius=base_radius
         )
 
         # Right cone
         x_right = center_x + right_offset
-        z_right_ground = get_ground_z(terrain_points, x_right, y)
+        z_right = get_ground_z(terrain_points, x_right, y)
         right_cone = generate_one_cone(
             cx=x_right,
             cy=y,
-            ground_z=z_right_ground,
+            ground_z=z_right,
             cone_height=cone_height,
             base_radius=base_radius
         )
@@ -250,43 +193,52 @@ def generate_cone_points_on_path(terrain_points,
 
     return cone_points
 
+
+# ------------------------------------------------------------------------------
+# Main Program
+# ------------------------------------------------------------------------------
+
 def main():
-    # 1) Generate the full environment (terrain)
+    # Generate Terrain
     terrain_points = generate_inclined_ground(
-        num_points=8000,
-        x_range=(-20, 20),
-        y_range=(-60, 60),
+        num_points=100000,
+        x_range=(-50, 50),
+        y_range=(-100, 100),
         incline=(0.2, 0.1),
         noise_scale=0.5,
         noise_octaves=4
     )
 
-    # 2) Define a path function (straight line for now)
+    # Define Path (straight line here, but can be replaced with piecewise logic)
     path_func = straight_path_function
 
-    # 3) Generate cones along that path
+    # Generate Cones Along the Path
     cone_points = generate_cone_points_on_path(
         terrain_points=terrain_points,
         path_func=path_func,
         y_min=-60,
         y_max=60,
-        step_size=5.0,
-        left_offset=-2.0,
-        right_offset=2.0,
+        step_size=5.0,     # spacing between cones along y
+        left_offset=-2.0,  # shift left
+        right_offset=2.0,  # shift right
         cone_height=1.5,
         base_radius=0.5
     )
 
-    # 4) Visualize the full environment
-    visualize_terrain_with_cones(terrain_points, cone_points)
+    # Visualize the Full Environment in Open3D
+    visualize_with_open3d(terrain_points, cone_points,
+                          terrain_color=(0, 0, 1),
+                          cone_color=(0.5, 0.8, 1.0))
 
-    # 5) Visualize a concentric lidar view, but with 3x ring density
-    visualize_concentric_lidar_view(
+    # Visualize a Concentric Lidar View (rings around (0,0))
+    visualize_concentric_with_open3d(
         terrain_points,
         cone_points,
-        ring_spacing=1.6667,  # triple the density (5.0 / 3 ≈ 1.6667)
+        ring_spacing=5.0,
         ring_width=1.0,
-        max_radius=20.0
+        max_radius=20.0,
+        terrain_color=(0, 0, 1),
+        cone_color=(0.5, 0.8, 1.0)
     )
 
 if __name__ == '__main__':
