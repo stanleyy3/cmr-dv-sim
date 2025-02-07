@@ -17,45 +17,67 @@ def create_open3d_pcd(np_points, rgb=(0.0, 0.0, 1.0)):
     pcd.colors = o3d.utility.Vector3dVector(colors)
     return pcd
 
+# --- New Custom Visualizer Function ---
+def custom_draw_geometries(geometries, window_name="Open3D", lookat=None, front=None, up=None, zoom=None):
+    """
+    Create a custom Open3D visualizer where you can set the camera parameters.
+    If a parameter is not provided, the default Open3D values are used.
+    """
+    vis = o3d.visualization.Visualizer()
+    vis.create_window(window_name=window_name)
+    for geo in geometries:
+        vis.add_geometry(geo)
+    view_ctrl = vis.get_view_control()
+    if lookat is not None:
+        view_ctrl.set_lookat(lookat)
+    if front is not None:
+        view_ctrl.set_front(front)
+    if up is not None:
+        view_ctrl.set_up(up)
+    if zoom is not None:
+        view_ctrl.set_zoom(zoom)
+    vis.run()
+    vis.destroy_window()
 
 def visualize_with_open3d_split(terrain_points, left_cone_points, right_cone_points,
                                 terrain_color=(0.0, 0.0, 1.0),
                                 left_cone_color=(1.0, 1.0, 0.0),
-                                right_cone_color=(0.5, 0.8, 1.0)):
+                                right_cone_color=(0.5, 0.8, 1.0),
+                                lookat=None, front=None, up=None, zoom=None):
     """
-    Visualize the full environment (terrain and cones) in a single Open3D window.
+    Visualize the full environment (terrain and cones) using a custom Open3D visualizer.
+    The additional camera parameters (lookat, front, up, zoom) allow zooming on any part of the scene.
     """
     pcd_terrain = create_open3d_pcd(terrain_points, rgb=terrain_color)
     pcd_left_cones = create_open3d_pcd(left_cone_points, rgb=left_cone_color)
     pcd_right_cones = create_open3d_pcd(right_cone_points, rgb=right_cone_color)
     
     geometries = [pcd_terrain, pcd_left_cones, pcd_right_cones]
-    o3d.visualization.draw_geometries(geometries, window_name="Full Environment")
-
+    # Use the custom visualizer instead of the default draw_geometries.
+    custom_draw_geometries(geometries, window_name="Full Environment", 
+                            lookat=lookat, front=front, up=up, zoom=zoom)
 
 def visualize_concentric_with_open3d_split(terrain_points, left_cone_points, right_cone_points,
                                            ring_spacing=1.0, ring_width=0.5,
                                            max_radius=20.0,
                                            terrain_color=(0.0, 0.0, 1.0),
                                            left_cone_color=(1.0, 1.0, 0.0),
-                                           right_cone_color=(0.5, 0.8, 1.0)):
+                                           right_cone_color=(0.5, 0.8, 1.0),
+                                           lookat=None, front=None, up=None, zoom=None):
     """
-    Visualize a concentric "ring-based" view of the environment.
-    Only points within ring_width/2 of each ring (spaced every ring_spacing units) are shown.
+    Visualize a concentric "ring-based" view of the environment using a custom visualizer.
+    The additional camera parameters allow zooming in on any region.
     """
     ring_positions = np.arange(ring_spacing, max_radius + ring_spacing, ring_spacing)
     
-    # Filter terrain points by radial distance from origin.
     r_terrain = np.sqrt(terrain_points[:, 0]**2 + terrain_points[:, 1]**2)
     mask_terrain = np.any(np.abs(r_terrain[:, None] - ring_positions) < (ring_width / 2), axis=1)
     local_terrain = terrain_points[mask_terrain]
     
-    # Filter left cones.
     r_left = np.sqrt(left_cone_points[:, 0]**2 + left_cone_points[:, 1]**2)
     mask_left = np.any(np.abs(r_left[:, None] - ring_positions) < (ring_width / 2), axis=1)
     local_left = left_cone_points[mask_left]
     
-    # Filter right cones.
     r_right = np.sqrt(right_cone_points[:, 0]**2 + right_cone_points[:, 1]**2)
     mask_right = np.any(np.abs(r_right[:, None] - ring_positions) < (ring_width / 2), axis=1)
     local_right = right_cone_points[mask_right]
@@ -65,11 +87,12 @@ def visualize_concentric_with_open3d_split(terrain_points, left_cone_points, rig
     pcd_right_cones = create_open3d_pcd(local_right, rgb=right_cone_color)
     
     geometries = [pcd_terrain, pcd_left_cones, pcd_right_cones]
-    o3d.visualization.draw_geometries(geometries, window_name="Concentric Lidar View")
+    custom_draw_geometries(geometries, window_name="Concentric Lidar View", 
+                            lookat=lookat, front=front, up=up, zoom=zoom)
 
-# ==============================================================================
-# Terrain Generation Functions
-# ==============================================================================
+# ============================================================================== 
+# Terrain Generation Functions 
+# ============================================================================== 
 
 def generate_inclined_ground(num_points=8000,
                              x_range=(-20, 20),
@@ -85,7 +108,6 @@ def generate_inclined_ground(num_points=8000,
     y_vals = np.random.uniform(y_range[0], y_range[1], num_points)
     z_vals = a * x_vals + b * y_vals
     
-    # Add Perlin noise to simulate natural variations.
     z_noise = np.array([
         pnoise2(x * noise_scale, y * noise_scale, octaves=noise_octaves)
         for x, y in zip(x_vals, y_vals)
@@ -94,9 +116,9 @@ def generate_inclined_ground(num_points=8000,
     
     return np.vstack((x_vals, y_vals, z_vals)).T
 
-# ==============================================================================
-# Ground Lookup Function
-# ==============================================================================
+# ============================================================================== 
+# Ground Lookup Function 
+# ============================================================================== 
 
 def get_ground_z(terrain_points, x, y):
     """
@@ -108,68 +130,83 @@ def get_ground_z(terrain_points, x, y):
     idx = np.argmin(dist_sq)
     return terrain_points[idx, 2]
 
-# ==============================================================================
-# Path Generation Functions (Piecewise Quadratic)
-# ==============================================================================
+# ============================================================================== 
+# Active Piecewise Quadratic Path Generation with Increased Variation 
+# ============================================================================== 
 
-def generate_random_piecewise_quadratic_function(y_min, y_max, num_segments=5,
-                                                   x_range=(-110, 110),
-                                                   A_range=(0.02, 0.5)):
+def generate_active_piecewise_quadratic_function_with_variation(y_min, y_max, num_segments=5, x_range=(-110, 110)):
     """
-    Generate a continuous piecewise quadratic function on [y_min, y_max].
+    Actively generate a continuous piecewise quadratic function on [y_min, y_max] that lies entirely within x_range.
     
-    For each segment [y0, y1]:
-      x(y) = A * (y - y0)^2 + B * (y - y0) + x0,
-    where:
-      - A is randomly chosen from A_range (ensuring 0.02 ≤ A ≤ 0.5).
-      - x0 and x1 (the endpoints) are chosen uniformly from x_range.
-      - B is computed to ensure the quadratic passes through (y1, x1).
-      
-    The function clamps the output to x_range.
+    We divide [y_min, y_max] into num_segments equal intervals. For each interval [y₍ᵢ₋₁₎, yᵢ] (with Δy constant),
+    we choose an endpoint xᵢ such that the difference d = xᵢ - x₍ᵢ₋₁₎ is randomly sampled from an allowed interval that ensures
+    there remains enough room for the remaining segments. d may be positive or negative.
+    
+    The quadratic coefficient for each segment is then A = d/(Δy)² and the segment is defined by:
+         x(y) = x₍ᵢ₋₁₎ + A · (y - y₍ᵢ₋₁₎)²   for y in [y₍ᵢ₋₁₎, yᵢ].
     """
-    # Create y-breakpoints for the segments
-    y_breaks = np.sort(np.random.uniform(y_min, y_max, num_segments - 1))
-    y_breaks = np.concatenate(([y_min], y_breaks, [y_max]))
+    n = num_segments
+    y_breaks = np.linspace(y_min, y_max, n+1)
+    delta_y = y_breaks[1] - y_breaks[0]
+    min_step = 0.02 * (delta_y**2)
+    max_step = 0.5 * (delta_y**2)
     
-    # Generate corresponding x-breakpoints uniformly from x_range
-    x_breaks = np.random.uniform(x_range[0], x_range[1], num_segments + 1)
+    x_min, x_max = x_range
+    x_points = [np.random.uniform(x_min, x_max)]
     
-    segments = []
-    for i in range(num_segments):
-        y0 = y_breaks[i]
-        y1 = y_breaks[i+1]
-        x0 = x_breaks[i]
-        x1 = x_breaks[i+1]
+    for i in range(1, n+1):
+        current_x = x_points[-1]
+        R = n - i  # remaining segments
+        pos_lower = min_step
+        pos_upper = min(max_step, x_max - current_x - R * min_step)
+        neg_upper = -min_step
+        neg_lower = max(-max_step, x_min - current_x + R * min_step)
         
-        # Choose A from the given range.
-        A = np.random.uniform(A_range[0], A_range[1])
+        pos_feasible = pos_lower <= pos_upper
+        neg_feasible = neg_lower <= neg_upper
         
-        # Compute B so that the quadratic passes through (y1, x1)
-        if y1 != y0:
-            B = (x1 - x0 - A * (y1 - y0)**2) / (y1 - y0)
+        allowed_interval = None
+        if pos_feasible and neg_feasible:
+            if np.random.rand() < 0.5:
+                allowed_interval = (pos_lower, pos_upper)
+            else:
+                allowed_interval = (neg_lower, neg_upper)
+        elif pos_feasible:
+            allowed_interval = (pos_lower, pos_upper)
+        elif neg_feasible:
+            allowed_interval = (neg_lower, neg_upper)
         else:
-            B = 0.0
-            
-        segments.append((y0, y1, A, B, x0))
+            raise ValueError(f"No feasible step for segment {i} from x={current_x:.2f}. Adjust parameters.")
+        
+        d = np.random.uniform(allowed_interval[0], allowed_interval[1])
+        new_x = current_x + d
+        x_points.append(new_x)
+        print(f"Segment {i}: current_x = {current_x:.2f}, chosen d = {d:.2f}, new_x = {new_x:.2f}")
+    
+    A_coeffs = []
+    for i in range(1, len(x_points)):
+        d = x_points[i] - x_points[i-1]
+        A = d / (delta_y**2)
+        A_coeffs.append(A)
+        print(f"Segment {i}: from x = {x_points[i-1]:.2f} to x = {x_points[i]:.2f}, A = {A:.3f}")
     
     def piecewise_quadratic(y):
-        # Determine which segment y falls into.
-        for (y0, y1, A, B, x0) in segments:
-            if y0 <= y < y1:
-                x_val = A * (y - y0)**2 + B * (y - y0) + x0
-                return np.clip(x_val, x_range[0], x_range[1])
-        # If y is exactly y_max, use the last segment.
+        for i in range(1, len(y_breaks)):
+            if y_breaks[i-1] <= y < y_breaks[i]:
+                A = A_coeffs[i-1]
+                x_start = x_points[i-1]
+                return np.clip(x_start + A * (y - y_breaks[i-1])**2, x_min, x_max)
         if y == y_max:
-            y0, y1, A, B, x0 = segments[-1]
-            x_val = A * (y - y0)**2 + B * (y - y0) + x0
-            return np.clip(x_val, x_range[0], x_range[1])
+            A = A_coeffs[-1]
+            x_start = x_points[-2]
+            return np.clip(x_start + A * (y - y_breaks[-2])**2, x_min, x_max)
         return 0.0
 
     return piecewise_quadratic
 
-# ==============================================================================
-# Cone Geometry Functions
-# ==============================================================================
+# ============================================================================== 
+# Cone Geometry Functions 
+# ============================================================================== 
 
 def generate_one_cone(cx, cy, ground_z, cone_height=1.5,
                       base_radius=0.5, vertical_segments=20, radial_subdivisions=30):
@@ -192,9 +229,9 @@ def generate_one_cone(cx, cy, ground_z, cone_height=1.5,
             cone_pts.append([px, py, z])
     return np.array(cone_pts)
 
-# ==============================================================================
-# Cone Placement Along the Spline via Arc-Length Parameterization
-# ==============================================================================
+# ============================================================================== 
+# Cone Placement Along the Spline via Arc-Length Parameterization 
+# ============================================================================== 
 
 def generate_cone_points_on_path_by_arc_length(terrain_points, path_func, y_min, y_max,
                                                step_size, left_offset, right_offset,
@@ -263,9 +300,9 @@ def generate_cone_points_on_path_by_arc_length(terrain_points, path_func, y_min,
     
     return left_cone_points, right_cone_points
 
-# ==============================================================================
-# Main Program
-# ==============================================================================
+# ============================================================================== 
+# Main Program 
+# ============================================================================== 
 
 def main():
     # Generate terrain.
@@ -281,13 +318,11 @@ def main():
         noise_octaves=4
     )
     
-    # Generate the piecewise quadratic path function.
-    # Now, every A coefficient will be in the range [0.02, 0.5].
-    path_func = generate_random_piecewise_quadratic_function(
+    # Actively generate the piecewise quadratic path function with increased variation.
+    path_func = generate_active_piecewise_quadratic_function_with_variation(
         y_min=-60, y_max=60,
         num_segments=5,
-        x_range=(-110, 110),
-        A_range=(0.02, 0.5)
+        x_range=(-110, 110)
     )
     
     # Place cone pairs along the spline using arc-length based placement.
@@ -303,17 +338,23 @@ def main():
         base_radius=0.3
     )
     
-    # Visualize the full environment.
+    # Visualize the full environment with custom camera parameters.
+    # You can change the following camera parameters (lookat, front, up, zoom)
+    # to zoom in on any part of the plot.
     visualize_with_open3d_split(
         terrain_points,
         left_cone_points,
         right_cone_points,
         terrain_color=(0, 0, 1),
         left_cone_color=(1, 0.8, 0),
-        right_cone_color=(0.5, 0.8, 1.0)
+        right_cone_color=(0.5, 0.8, 1.0),
+        lookat=[-30, -30, 0],   # Change as desired
+        front=[0, -1, 0],
+        up=[0, 0, 1],
+        zoom=0.45
     )
     
-    # Visualize a concentric lidar view.
+    # Visualize a concentric lidar view with custom camera parameters.
     visualize_concentric_with_open3d_split(
         terrain_points,
         left_cone_points,
@@ -323,7 +364,11 @@ def main():
         max_radius=15.0,
         terrain_color=(0, 0, 1),
         left_cone_color=(1, 0.8, 0),
-        right_cone_color=(0.5, 0.8, 1.0)
+        right_cone_color=(0.5, 0.8, 1.0),
+        lookat=[-30, -30, 0],   # Change as desired
+        front=[0, -1, 0],
+        up=[0, 0, 1],
+        zoom=0.45
     )
 
 if __name__ == '__main__':
