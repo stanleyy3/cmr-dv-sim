@@ -3,3 +3,4 @@ noise
 matplotlib
 scipy
 open3d
+opencv-python
