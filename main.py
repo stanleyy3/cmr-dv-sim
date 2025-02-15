@@ -713,7 +713,7 @@ def main():
     else:
         # Let user pick open or closed
         print("You chose 'Random' spline generation.")
-        print("Now choose 'open' or 'closed' random track approach (article uses 200×200 bounding for closed).")
+        print("Choose 'open' or 'closed' random track approach.")
         while True:
             track_type=input("Open or Closed? (o/c): ").strip().lower()
             if track_type=="o":
