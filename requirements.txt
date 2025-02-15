@@ -2,5 +2,5 @@ numpy
 noise
 matplotlib
 scipy
-open3d
+open3d>=0.15.1
 opencv-python
