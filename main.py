@@ -3,8 +3,7 @@ from noise import pnoise2
 import open3d as o3d
 import cv2
 from scipy.interpolate import make_interp_spline
-import open3d.visualization.gui as gui
-import open3d.visualization.rendering as rendering
+from open3d.visualization import gui, rendering
 import threading
 import time
 
