@@ -476,7 +476,11 @@ def generate_continuous_tube_mesh(curve_points, radius, resolution,
             tangent = curve_points[-1] - curve_points[-2]
         else:
             tangent = curve_points[i+1] - curve_points[i-1]
-        tangent = tangent / np.linalg.norm(tangent)
+        norm_t = np.linalg.norm(tangent)
+        if norm_t < 1e-6:
+            tangent = np.array([1, 0, 0])
+        else:
+            tangent = tangent / norm_t
         tangents.append(tangent)
     if abs(np.dot(tangents[0], [0, 0, 1])) < 0.99:
         normal0 = np.array([0, 0, 1])
@@ -617,8 +621,8 @@ def generate_cone_points_on_path_by_arc_length(terrain_points, path_func, y_min,
     N_samples = 1000
     y_samples = np.linspace(y_min, y_max, N_samples)
     x_samples = np.array([path_func(y) for y in y_samples])
-    dx_dy = np.gradient(x_samples, y_samples)
     dy = y_samples[1] - y_samples[0]
+    dx_dy = np.gradient(x_samples, dy)
     ds_samples = np.sqrt(dx_dy**2 + 1) * dy
     s = np.zeros_like(y_samples)
     s[1:] = np.cumsum(ds_samples[1:])
@@ -874,7 +878,7 @@ def run_dynamic_concentric_view(terrain_points, left_cone_points, right_cone_poi
         else:
             tangent = tangent / norm_t
         # Build the view direction: horizontal tangent plus a fixed downward component.
-        # For a 45° downward angle, combine the horizontal (tangent) and vertical (-1) parts.
+        # For a 45° downward angle, combine the horizontal (tangent) and vertical (-0.5) parts.
         view_dir = np.array([tangent[0], tangent[1], -0.5])
         view_dir = view_dir / np.linalg.norm(view_dir)
         # Place the camera at a fixed distance opposite to the view direction.
