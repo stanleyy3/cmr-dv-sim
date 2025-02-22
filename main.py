@@ -2,9 +2,8 @@ import numpy as np
 from noise import pnoise2
 import open3d as o3d
 import cv2
-from scipy.interpolate import make_interp_spline, CubicSpline
-import open3d.visualization.gui as gui
-import open3d.visualization.rendering as rendering
+from scipy.interpolate import make_interp_spline
+from open3d.visualization import gui, rendering
 import threading
 import time
 from scipy.spatial import ConvexHull  # still available if needed elsewhere
