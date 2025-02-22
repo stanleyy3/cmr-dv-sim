@@ -12,10 +12,17 @@ from scipy.spatial import ConvexHull  # still imported if needed elsewhere
 # ==============================================================================
 # Utility Functions
 # ==============================================================================
+
 def create_open3d_pcd(np_points, rgb=(0.0, 0.0, 1.0)):
     """
-    Create an Open3D PointCloud from an Nx3 numpy array of points.
-    Assign a uniform RGB color to all points.
+    Create an Open3D PointCloud from an Nx3 numpy array.
+    
+    Parameters:
+      np_points (ndarray): Nx3 array of point coordinates.
+      rgb (tuple): RGB color to assign to all points.
+      
+    Returns:
+      pcd (Open3D.geometry.PointCloud): The generated point cloud.
     """
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(np_points)
@@ -30,7 +37,18 @@ def generate_inclined_ground(num_points=8000,
                              noise_scale=0.5,
                              noise_octaves=4):
     """
-    Generate randomly inclined + noise terrain points.
+    Generate a set of 3D terrain points with a linear incline and added noise.
+    
+    Parameters:
+      num_points (int): Number of terrain points.
+      x_range (tuple): Range for x-values.
+      y_range (tuple): Range for y-values.
+      incline (tuple): Coefficients (a, b) for the plane z = a*x + b*y.
+      noise_scale (float): Scale for the Perlin noise.
+      noise_octaves (int): Number of octaves for the Perlin noise.
+      
+    Returns:
+      points (ndarray): An Nx3 numpy array of terrain points.
     """
     a, b = incline
     x_vals = np.random.uniform(x_range[0], x_range[1], num_points)
@@ -43,7 +61,15 @@ def generate_inclined_ground(num_points=8000,
 
 def get_ground_z(terrain_points, x, y):
     """
-    Find the Z value in terrain_points nearest (x, y).
+    Find the ground elevation (z-value) nearest to the given (x,y) coordinate.
+    
+    Parameters:
+      terrain_points (ndarray): Array of terrain points (Nx3).
+      x (float): x-coordinate.
+      y (float): y-coordinate.
+      
+    Returns:
+      z (float): The z-value of the closest terrain point.
     """
     dx = terrain_points[:, 0] - x
     dy = terrain_points[:, 1] - y
@@ -54,7 +80,14 @@ def get_ground_z(terrain_points, x, y):
 def run_gui_window(geometries, window_title="Open3D", width=1024, height=768,
                    lookat=None, front=None, up=None, zoom=None):
     """
-    Create a simple, non-interactive GUI window with the given geometries.
+    Create and run a non-interactive Open3D GUI window displaying given geometries.
+    
+    Parameters:
+      geometries (list): List of Open3D geometries to display.
+      window_title (str): Title of the window.
+      width (int): Window width.
+      height (int): Window height.
+      lookat, front, up, zoom: Camera parameters.
     """
     app = gui.Application.instance
     app.initialize()
@@ -81,9 +114,18 @@ def run_gui_window(geometries, window_title="Open3D", width=1024, height=768,
 # ==============================================================================
 class InteractiveSceneWidget(gui.SceneWidget):
     """
-    SceneWidget that allows CTRL + Left Mouse drag to update offset along normal/binormal.
+    An interactive scene widget that allows modifying the tube geometry by dragging
+    with CTRL + Left Mouse button.
     """
     def __init__(self, tube_update_callback, tube_geom_key, material):
+        """
+        Initialize the widget.
+        
+        Parameters:
+          tube_update_callback (function): Callback to update the tube mesh.
+          tube_geom_key (str): Key for the tube geometry.
+          material (MaterialRecord): Material for rendering.
+        """
         super().__init__()
         self.tube_update_callback = tube_update_callback
         self.tube_geom_key = tube_geom_key
@@ -95,6 +137,9 @@ class InteractiveSceneWidget(gui.SceneWidget):
         self.last_mouse_y = 0
 
     def on_mouse_event(self, event):
+        """
+        Handle mouse events to update the tube offset interactively.
+        """
         if event.type == gui.MouseEvent.Type.DOWN and event.button == gui.MouseButton.LEFT:
             if event.modifiers & gui.KeyModifier.CTRL:
                 self.dragging = True
@@ -128,16 +173,21 @@ def run_interactive_gui_window(geometries, tube_update_callback, tube_geom_key="
                                window_title="Open3D", width=1024, height=768,
                                lookat=None, front=None, up=None, zoom=None):
     """
-    GUI window that lets you drag (CTRL + Left Mouse) to offset the tube geometry.
+    Create and run an interactive GUI window that displays the geometries and allows
+    interactive tube offset adjustments.
+    
+    Parameters:
+      geometries (list): List of geometries to display.
+      tube_update_callback (function): Callback for updating the tube geometry.
+      tube_geom_key (str): Key for the tube geometry.
+      Other parameters: window title, dimensions, and camera settings.
     """
     app = gui.Application.instance
     app.initialize()
     window = app.create_window(window_title, width, height)
-
     material = rendering.MaterialRecord()
     material.shader = "defaultLit"
     material.point_size = 5.0
-
     scene = InteractiveSceneWidget(tube_update_callback, tube_geom_key, material)
     scene.scene = rendering.Open3DScene(window.renderer)
     window.add_child(scene)
@@ -155,6 +205,7 @@ def run_interactive_gui_window(geometries, tube_update_callback, tube_geom_key="
     app.run()
 
 # ==============================================================================
+<<<<<<< Updated upstream
 # Spline Generation (Existing Open Track)
 # ==============================================================================
 def generate_active_piecewise_quadratic_function_with_variation(y_min, y_max, num_segments=5, x_range=(-110,110)):
@@ -162,6 +213,21 @@ def generate_active_piecewise_quadratic_function_with_variation(y_min, y_max, nu
     Generates an OPEN track function mapping y -> x as a set of separate quadratic segments.
     Each segment is defined by:
          f_i(y) = x_start_i + A_i * (y - y_breaks[i])**2, for y in [y_breaks[i], y_breaks[i+1]]
+=======
+# Spline Generation (Open Track)
+# ==============================================================================
+def generate_active_piecewise_quadratic_function_with_variation(y_min, y_max, num_segments=5, x_range=(-110,110)):
+    """
+    Generates an open-track function f(y) mapping y -> x as a set of quadratic segments.
+    
+    Parameters:
+      y_min, y_max (float): Domain for y.
+      num_segments (int): Number of segments.
+      x_range (tuple): Allowed x-range.
+    
+    Returns:
+      function: A function f(y) that returns x.
+>>>>>>> Stashed changes
     """
     x_min, x_max = x_range
     if y_min == y_max:
@@ -205,12 +271,24 @@ def generate_active_piecewise_quadratic_function_with_variation(y_min, y_max, nu
     
     segment_functions = []
     def make_segment_function(x_start, A, y_start):
+<<<<<<< Updated upstream
+=======
+        """
+        Creates a quadratic function for a segment starting at y_start.
+        """
+>>>>>>> Stashed changes
         return lambda y, x_start=x_start, A=A, y_start=y_start: np.clip(x_start + A * (y - y_start) ** 2, x_min, x_max)
     
     for i in range(n):
         segment_functions.append(make_segment_function(x_points[i], A_coeffs[i], y_breaks[i]))
     
     def piecewise_function(y):
+<<<<<<< Updated upstream
+=======
+        """
+        Returns x for a given y by selecting the correct segment.
+        """
+>>>>>>> Stashed changes
         if y < y_min:
             y = y_min
         elif y > y_max:
@@ -230,8 +308,19 @@ def generate_active_piecewise_quadratic_function_with_variation(y_min, y_max, nu
 # ==============================================================================
 def make_parametric_track_open(piecewise_func, y_min, y_max):
     """
+<<<<<<< Updated upstream
     Converts an open track defined by f(y) into a parametric function param_func(t)
     for t in [0,1] that returns (x,y) where y is linearly interpolated.
+=======
+    Converts an open-track function f(y) into a parametric function (x(t), y(t)) for t in [0,1].
+    
+    Parameters:
+      piecewise_func (function): Function mapping y -> x.
+      y_min, y_max (float): Domain for y.
+    
+    Returns:
+      function: A function param_func(t) that returns (x,y).
+>>>>>>> Stashed changes
     """
     def param_func(t):
         Y = y_min + t * (y_max - y_min)
@@ -241,7 +330,19 @@ def make_parametric_track_open(piecewise_func, y_min, y_max):
 
 def generate_closed_track_splines(point_count=(10,20), push_iters=3, push_dist=15.0):
     """
+<<<<<<< Updated upstream
     Generates a closed racetrack as periodic B-splines x_spline(theta) and y_spline(theta).
+=======
+    Generates a closed racetrack as periodic B-splines for x(theta) and y(theta).
+    
+    Parameters:
+      point_count (tuple): Min and max number of control points.
+      push_iters (int): Number of iterations to push points for spacing.
+      push_dist (float): Minimum desired distance between points.
+    
+    Returns:
+      tuple: (x_spline, y_spline) representing the closed track.
+>>>>>>> Stashed changes
     """
     num_points = np.random.randint(point_count[0], point_count[1] + 1)
     points = []
@@ -271,18 +372,35 @@ def generate_closed_track_splines(point_count=(10,20), push_iters=3, push_dist=1
     # Ensure closure by repeating the first point
     points = np.vstack([points, points[0]])
     tvals = np.linspace(0, 2*np.pi, len(points))
+<<<<<<< Updated upstream
     # Create periodic splines
+=======
+    # Create periodic splines with cubic interpolation
+>>>>>>> Stashed changes
     x_spline = make_interp_spline(tvals, points[:,0], k=3, bc_type='periodic')
     y_spline = make_interp_spline(tvals, points[:,1], k=3, bc_type='periodic')
     return x_spline, y_spline
 
 def make_parametric_track_closed(x_spline, y_spline):
     """
+<<<<<<< Updated upstream
     Converts the closed track B-splines into a parametric function param_func(t)
     for t in [0,1], using theta = 2*pi*t.
     """
     def param_func(t):
         t = t % 1.0  # ensure t is in [0,1]
+=======
+    Converts the closed track B-splines into a parametric function (x(t), y(t)) for t in [0,1].
+    
+    Parameters:
+      x_spline, y_spline: Spline functions for x and y.
+      
+    Returns:
+      function: A function param_func(t) returning (x,y) for t in [0,1].
+    """
+    def param_func(t):
+        t = t % 1.0  # Ensure t is in [0,1]
+>>>>>>> Stashed changes
         theta = 2 * np.pi * t
         X = float(x_spline(theta))
         Y = float(y_spline(theta))
@@ -293,7 +411,23 @@ def generate_tube_from_param(terrain_points, param_func, num_samples=1000,
                              thickness=0.5, resolution=20, color=[1,0,0],
                              roll_angle=0.0):
     """
+<<<<<<< Updated upstream
     Generates a tube mesh that follows the parametric curve exactly.
+=======
+    Generates a tube mesh that follows a parametric 2D centerline (x(t), y(t)).
+    
+    Parameters:
+      terrain_points (ndarray): The terrain for determining ground z.
+      param_func (function): Function mapping t in [0,1] to (x,y).
+      num_samples (int): Number of samples along the centerline.
+      thickness (float): Tube thickness.
+      resolution (int): Number of subdivisions around the tube.
+      color (list): RGB color for the tube.
+      roll_angle (float): Additional roll angle for the tube.
+      
+    Returns:
+      tube_mesh (TriangleMesh): The generated tube mesh.
+>>>>>>> Stashed changes
     """
     ts = np.linspace(0, 1, num_samples)
     curve_points = []
@@ -302,7 +436,11 @@ def generate_tube_from_param(terrain_points, param_func, num_samples=1000,
         Z = get_ground_z(terrain_points, X, Y)
         curve_points.append([X, Y, Z])
     curve_points = np.array(curve_points)
+<<<<<<< Updated upstream
     # For closed tracks, append the first point to ensure closure
+=======
+    # For closed tracks, append the first point to ensure closure if needed
+>>>>>>> Stashed changes
     if np.allclose(curve_points[0, :2], param_func(1.0)):
         curve_points = np.vstack([curve_points, curve_points[0]])
     tube_mesh = generate_continuous_tube_mesh(
@@ -315,11 +453,23 @@ def generate_tube_from_param(terrain_points, param_func, num_samples=1000,
     return tube_mesh
 
 # ==============================================================================
+<<<<<<< Updated upstream
 # Spline From Image (Unchanged)
+=======
+# Spline From Image
+>>>>>>> Stashed changes
 # ==============================================================================
 def generate_spline_from_image(filename, x_range, y_range):
     """
-    (unchanged)
+    Generates a spline function from an image file contour.
+    
+    Parameters:
+      filename (str): Image filename.
+      x_range (tuple): Target x-range.
+      y_range (tuple): Target y-range.
+      
+    Returns:
+      spline (function): Spline function mapping unique y values to x values.
     """
     print("Loading image:", filename)
     img = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
@@ -351,7 +501,17 @@ def generate_spline_from_image(filename, x_range, y_range):
 def generate_continuous_tube_mesh(curve_points, radius, resolution,
                                   center_offset=(0.0, 0.0, 0.0), roll_angle=0.0):
     """
-    (unchanged)
+    Generates a triangle mesh tube along a provided 3D curve.
+    
+    Parameters:
+      curve_points (ndarray): Nx3 array of centerline points.
+      radius (float): Radius of the tube.
+      resolution (int): Number of subdivisions around the tube.
+      center_offset (tuple): Offset vector added to each center point.
+      roll_angle (float): Rotation angle (roll) applied along the tube.
+      
+    Returns:
+      mesh (TriangleMesh): The generated tube mesh.
     """
     n = len(curve_points)
     tangents = []
@@ -416,13 +576,61 @@ def generate_continuous_tube_mesh(curve_points, radius, resolution,
     mesh.compute_vertex_normals()
     return mesh
 
+<<<<<<< Updated upstream
+=======
+def generate_thick_spline_line(terrain_points, path_func, y_min, y_max,
+                               num_samples=1000, thickness=0.5, resolution=20, color=[1,0,0],
+                               center_offset=(0.0,0.0,0.0), roll_angle=0.0):
+    """
+    (Legacy) Generates a tube along a centerline defined by sampling f(y) for y in [y_min,y_max].
+    
+    Parameters:
+      terrain_points (ndarray): Terrain points.
+      path_func (function): Function mapping y -> x.
+      y_min, y_max (float): Domain for y.
+      Other parameters: Sampling, thickness, resolution, etc.
+      
+    Returns:
+      tube_mesh (TriangleMesh): The generated tube mesh.
+      
+    Note: This function is used for image-based or open tracks that assume y->x.
+    """
+    ys = np.linspace(y_min, y_max, num_samples)
+    curve_points = []
+    for y in ys:
+        x = path_func(y)
+        z = get_ground_z(terrain_points, x, y)
+        curve_points.append([x, y, z])
+    curve_points = np.array(curve_points)
+    tube_mesh = generate_continuous_tube_mesh(
+        curve_points,
+        radius=thickness / 10.0,
+        resolution=resolution,
+        center_offset=center_offset,
+        roll_angle=roll_angle
+    )
+    tube_mesh.paint_uniform_color(color)
+    return tube_mesh
+
+>>>>>>> Stashed changes
 # ==============================================================================
 # Cones and Markers (Unchanged)
 # ==============================================================================
 def generate_one_cone(cx, cy, ground_z, cone_height=1.5,
                       base_radius=0.5, vertical_segments=20, radial_subdivisions=30):
     """
-    (unchanged)
+    Generate a single cone mesh at the given base position.
+    
+    Parameters:
+      cx, cy (float): Center of the cone base.
+      ground_z (float): Ground elevation at the base.
+      cone_height (float): Height of the cone.
+      base_radius (float): Base radius of the cone.
+      vertical_segments (int): Number of vertical segments.
+      radial_subdivisions (int): Number of subdivisions around the cone.
+      
+    Returns:
+      cone_pts (ndarray): Array of cone points.
     """
     cone_pts = []
     for i in range(vertical_segments):
@@ -440,7 +648,18 @@ def generate_cone_points_on_path_by_arc_length(terrain_points, path_func, y_min,
                                                step_size, left_offset, right_offset,
                                                cone_height, base_radius):
     """
-    (unchanged)
+    Generate cone marker points along a path determined by f(y) (y->x) using arc-length sampling.
+    
+    Parameters:
+      terrain_points (ndarray): Terrain points.
+      path_func (function): Function mapping y -> x.
+      y_min, y_max (float): Domain for y.
+      step_size (float): Desired arc-length spacing.
+      left_offset, right_offset (float): Lateral offsets for cones.
+      cone_height, base_radius: Cone dimensions.
+      
+    Returns:
+      tuple: (left_cone_points, right_cone_points) arrays.
     """
     N_samples = 1000
     y_samples = np.linspace(y_min, y_max, N_samples)
@@ -485,7 +704,15 @@ def generate_cone_points_on_path_by_arc_length(terrain_points, path_func, y_min,
 
 def generate_two_corner_markers(terrain_points, x_range, y_range, marker_radius=1.0):
     """
-    (unchanged)
+    Generates two corner marker spheres at the bottom-left and top-right of the given region.
+    
+    Parameters:
+      terrain_points (ndarray): Terrain points.
+      x_range, y_range (tuple): Region bounds.
+      marker_radius (float): Radius of the sphere marker.
+      
+    Returns:
+      markers (list): List of sphere meshes.
     """
     markers = []
     x_bl, y_bl = x_range[0], y_range[0]
@@ -505,7 +732,11 @@ def generate_two_corner_markers(terrain_points, x_range, y_range, marker_radius=
     return markers
 
 # ==============================================================================
+<<<<<<< Updated upstream
 # Simple Full-Environment Visualization (Unchanged)
+=======
+# Full-Environment Visualization
+>>>>>>> Stashed changes
 # ==============================================================================
 def visualize_with_open3d_split(terrain_points, left_cone_points, right_cone_points,
                                 terrain_color=(0.0, 0.0, 1.0),
@@ -514,7 +745,12 @@ def visualize_with_open3d_split(terrain_points, left_cone_points, right_cone_poi
                                 lookat=None, front=None, up=None, zoom=None,
                                 spline_line=None, markers=None):
     """
-    (unchanged)
+    Visualizes the full environment (terrain, cones, spline line, markers) in a GUI window.
+    
+    Parameters:
+      terrain_points, left_cone_points, right_cone_points: Geometry arrays.
+      terrain_color, left_cone_color, right_cone_color: Colors for each.
+      Optional camera parameters and an extra spline_line or markers.
     """
     pcd_terrain = create_open3d_pcd(terrain_points, rgb=terrain_color)
     pcd_left_cones = create_open3d_pcd(left_cone_points, rgb=left_cone_color)
@@ -532,17 +768,29 @@ def visualize_concentric_with_open3d_split(terrain_points, left_cone_points, rig
                                            right_cone_color=(0.5, 0.8, 1.0),
                                            lookat=None, front=None, up=None, zoom=None):
     """
-    (unchanged)
+    Visualizes a concentric view of the environment by filtering terrain and cone points.
+    
+    Parameters:
+      ring_spacing, ring_width, max_radius: Parameters for the concentric rings.
+      Colors and optional camera parameters.
     """
     ring_positions = np.arange(ring_spacing, max_radius + ring_spacing, ring_spacing)
     r_terrain = np.sqrt(terrain_points[:, 0]**2 + terrain_points[:, 1]**2)
     mask_terrain = np.any(np.abs(r_terrain[:, None] - ring_positions) < (ring_width / 2), axis=1)
     local_terrain = terrain_points[mask_terrain]
+<<<<<<< Updated upstream
     r_left = np.sqrt(left_cone_points[:, 0]**2 + left_cone_points[:, 1]**2)
     mask_left = np.any(np.abs(r_left[:, None] - ring_positions) < (ring_width / 2), axis=1)
     local_left = left_cone_points[mask_left]
     r_right = np.sqrt(right_cone_points[:, 0]**2 + right_cone_points[:, 1]**2)
     mask_right = np.any(np.abs(r_right[:, None] - ring_positions) < (ring_width / 2), axis=1)
+=======
+    r_left = np.sqrt(left_cone_points[:,0]**2 + left_cone_points[:,1]**2)
+    mask_left = np.any(np.abs(r_left[:,None] - ring_positions) < (ring_width/2), axis=1)
+    local_left = left_cone_points[mask_left]
+    r_right = np.sqrt(right_cone_points[:,0]**2 + right_cone_points[:,1]**2)
+    mask_right = np.any(np.abs(r_right[:,None] - ring_positions) < (ring_width/2), axis=1)
+>>>>>>> Stashed changes
     local_right = right_cone_points[mask_right]
     pcd_terrain = create_open3d_pcd(local_terrain, rgb=terrain_color)
     pcd_left_cones = create_open3d_pcd(local_left, rgb=left_cone_color)
@@ -555,7 +803,14 @@ def run_dynamic_concentric_view(terrain_points, left_cone_points, right_cone_poi
                                 step_interval, window_title="Concentric Dynamic View",
                                 width=1024, height=768):
     """
-    (unchanged)
+    Runs a dynamic view where the center is updated over time.
+    
+    Parameters:
+      terrain_points, left_cone_points, right_cone_points: Environment geometries.
+      centers (list): List of center points to animate.
+      ring_spacing, ring_width, max_radius: Parameters for concentric rings.
+      step_interval (float): Time between center updates.
+      Other window parameters.
     """
     app = gui.Application.instance
     app.initialize()
@@ -574,13 +829,23 @@ def run_dynamic_concentric_view(terrain_points, left_cone_points, right_cone_poi
         ring_positions = np.arange(ring_spacing, max_radius + ring_spacing, ring_spacing)
         mask_terrain = np.any(np.abs(r_terrain[:, None] - ring_positions) < (ring_width / 2), axis=1)
         local_terrain = terrain_points[mask_terrain]
+<<<<<<< Updated upstream
         dx_left = left_cone_points[:, 0] - center[0]
         dy_left = left_cone_points[:, 1] - center[1]
+=======
+        dx_left = left_cone_points[:,0] - center[0]
+        dy_left = left_cone_points[:,1] - center[1]
+>>>>>>> Stashed changes
         r_left = np.sqrt(dx_left**2 + dy_left**2)
         mask_left = np.any(np.abs(r_left[:, None] - ring_positions) < (ring_width / 2), axis=1)
         local_left = left_cone_points[mask_left]
+<<<<<<< Updated upstream
         dx_right = right_cone_points[:, 0] - center[0]
         dy_right = right_cone_points[:, 1] - center[1]
+=======
+        dx_right = right_cone_points[:,0] - center[0]
+        dy_right = right_cone_points[:,1] - center[1]
+>>>>>>> Stashed changes
         r_right = np.sqrt(dx_right**2 + dy_right**2)
         mask_right = np.any(np.abs(r_right[:, None] - ring_positions) < (ring_width / 2), axis=1)
         local_right = right_cone_points[mask_right]
@@ -620,6 +885,15 @@ def run_dynamic_concentric_view(terrain_points, left_cone_points, right_cone_poi
 # Main Program
 # ==============================================================================
 def main():
+    """
+    Main entry point for the simulation.
+    
+    - Generates terrain.
+    - Prompts the user for track generation method (Random or Image-based).
+    - Allows selection of open or closed track (for Random).
+    - Generates the tube (and cones/markers) along the chosen track.
+    - Runs interactive and concentric view modes.
+    """
     slope_range = (-0.2, 0.2)
     a, b = np.random.uniform(low=slope_range[0], high=slope_range[1], size=2)
     terrain_points = generate_inclined_ground(
@@ -667,7 +941,12 @@ def main():
                     terrain_points, param_func,
                     num_samples=1000, thickness=0.5, resolution=20, color=[1, 0, 0]
                 )
+<<<<<<< Updated upstream
                 path_func = piecewise_func  # For cone generation (open tracks)
+=======
+                # For cone generation on open tracks, use the original piecewise function
+                path_func = piecewise_func  
+>>>>>>> Stashed changes
                 break
             elif track_type == "c":
                 print("Generating a CLOSED track using the new procedural method.")
@@ -677,7 +956,11 @@ def main():
                     terrain_points, param_func,
                     num_samples=1000, thickness=0.5, resolution=20, color=[1, 0, 0]
                 )
+<<<<<<< Updated upstream
                 # For cones, mapping y->x is ambiguous; we define a fallback:
+=======
+                # For cones, mapping y->x is ambiguous; use a fallback:
+>>>>>>> Stashed changes
                 path_func = lambda y: x_spline(2*np.pi*((y - y_range[0])/(y_range[1]-y_range[0])))
                 break
             else:
